@@ -54,6 +54,7 @@ def _get_api_key() -> str:
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY is set.")
+    logger.info("[build_index] Using API key: %s…%s", key[:8], key[-4:])
     return key
 
 

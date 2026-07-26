@@ -19,7 +19,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import streamlit as st
 
-load_dotenv()  # loads GEMINI_API_KEY from .env for local dev; no-op in Cloud Run
+load_dotenv(override=True)  # always use .env values, overriding stale Windows env vars
 
 logging.basicConfig(
     level=logging.INFO,

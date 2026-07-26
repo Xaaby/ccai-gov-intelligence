@@ -1,0 +1,30 @@
+# Environment secrets — never commit
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# FAISS index cache — built at runtime, not stored in repo
+app/rag/cjis_index.faiss
+app/rag/cjis_chunks.json
+
+# SQLite database — seeded at build time
+app/data/gov_intel.db
+
+# CJIS PDF — downloaded at Docker build time
+app/rag/cjis_policy.pdf
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp

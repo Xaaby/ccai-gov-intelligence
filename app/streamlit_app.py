@@ -16,7 +16,10 @@ import sqlite3
 import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv
 import streamlit as st
+
+load_dotenv()  # loads GEMINI_API_KEY from .env for local dev; no-op in Cloud Run
 
 logging.basicConfig(
     level=logging.INFO,

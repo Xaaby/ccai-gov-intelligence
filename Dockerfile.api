@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Ensure 'from app.xxx import ...' resolves correctly
+ENV PYTHONPATH=/app
+
+# System dependencies for FAISS
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY app/ ./app/
+
+# Download CJIS Security Policy PDF at build time (public document).
+# Primary URL: FBI CJIS Security Policy v5.9.5 (December 2024).
+# Falls back gracefully if unavailable — the index will build from hardcoded
+# fallback text at runtime with a clear warning rather than silently failing.
+RUN wget -q -O app/rag/cjis_policy.pdf \
+    "https://le.fbi.gov/cjis-division/cjis-security-policy/resource-center/cjis-security-policy-resource-center/2024/cjis-security-policy-v5-9-5-20241217.pdf" \
+    || wget -q -O app/rag/cjis_policy.pdf \
+    "https://www.dps.texas.gov/sites/default/files/documents/administration/cjis/cjis-security-policy-v5-9-5-20241217.pdf" \
+    || echo "WARNING: CJIS PDF download failed. The FAISS index will use hardcoded fallback text at runtime."
+
+# Seed SQLite database with tables and pre-built 311 demo data
+RUN python app/data/seed_requests.py
+
+# Single port — Cloud Run requirement
+EXPOSE 8080
+
+# FastAPI only — Uvicorn is the only listener
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8080"]

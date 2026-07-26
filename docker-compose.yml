@@ -14,3 +14,17 @@ services:
       # Mount local app/ directory for fast iteration without rebuilding
       - ./app:/app/app
     restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: ccai-gov-intelligence-api:local
+    ports:
+      - "8001:8080"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./app/data:/app/app/data
+      - ./app/rag:/app/app/rag
+    restart: unless-stopped

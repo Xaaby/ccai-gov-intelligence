@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -211,8 +212,9 @@ def _embed_chunks(client: genai.Client, chunks: List[Dict]) -> np.ndarray:
             contents=chunk["chunk_text"],
         )
         embeddings.append(result.embeddings[0].values)
-        if (i + 1) % 50 == 0:
+        if (i + 1) % 10 == 0:
             logger.info("[build_index] Embedded %d / %d chunks…", i + 1, len(chunks))
+        time.sleep(0.5)  # stay within free-tier rate limit (15 RPM)
     return np.array(embeddings, dtype=np.float32)
 
 

@@ -59,26 +59,38 @@ def _get_api_key() -> str:
 
 def _embed_text_v1(api_key: str, text: str) -> List[float]:
     """
-    Embed a single text string using the v1 REST API directly.
+    Embed a single text string via the Gemini REST API directly.
 
-    Bypasses the google-genai SDK entirely to avoid the SDK's hardcoded
-    v1beta routing which makes text-embedding-004 unavailable.
-
-    Endpoint: POST /v1/models/text-embedding-004:embedContent
+    Tries text-embedding-004 (v1beta) first; falls back to embedding-001
+    (v1beta) if 404 is returned. Both produce 768-dimensional vectors.
+    Bypasses the google-genai SDK to avoid batchEmbedContents routing issues.
     """
-    url = (
-        "https://generativelanguage.googleapis.com"
-        f"/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+    base = "https://generativelanguage.googleapis.com/v1beta/models"
+    models = ["text-embedding-004", "embedding-001"]
+    body = json.dumps({"content": {"parts": [{"text": text}]}}).encode()
+
+    for model in models:
+        url = f"{base}/{model}:embedContent?key={api_key}"
+        req = urllib.request.Request(
+            url, data=body, headers={"Content-Type": "application/json"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+            return data["embedding"]["values"]
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode(errors="replace")
+            logger.warning(
+                "[build_index] Embed failed for %s (HTTP %d): %s",
+                model, exc.code, error_body[:400],
+            )
+            if exc.code != 404:
+                raise
+            # 404 → try next model
+    raise RuntimeError(
+        "All embedding models returned 404. Check your GEMINI_API_KEY is valid "
+        "and has access to the Gemini API at generativelanguage.googleapis.com."
     )
-    body = json.dumps({
-        "content": {"parts": [{"text": text}]},
-    }).encode()
-    req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    return data["embedding"]["values"]
 
 
 def _pdf_is_valid(pdf_path: Path) -> bool:

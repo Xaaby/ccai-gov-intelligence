@@ -40,11 +40,22 @@ SECTION_HEADER_RE = re.compile(r"^\d+\.\d+(\.\d+)*\s+\S")
 
 
 def _get_client() -> genai.Client:
-    """Return an authenticated Gemini client."""
+    """Return an authenticated Gemini client (v1beta — used for generation)."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
     return genai.Client(api_key=api_key)
+
+
+def _get_embed_client() -> genai.Client:
+    """
+    Return a Gemini client configured for the v1 stable API.
+    Required for text-embedding-004, which is not available on v1beta in SDK 2.x.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
+    return genai.Client(api_key=api_key, http_options={"api_version": "v1"})
 
 
 def _pdf_is_valid(pdf_path: Path) -> bool:
@@ -284,9 +295,7 @@ def load_or_build_index() -> Tuple[faiss.Index, List[Dict]]:
     if not chunks:
         chunks = _chunks_from_fallback()
 
-    client = _get_client()
-
-    vectors = _embed_chunks(client, chunks)
+    vectors = _embed_chunks(chunks)
     index = _build_faiss_index(vectors)
     _save_to_disk(index, chunks)
 

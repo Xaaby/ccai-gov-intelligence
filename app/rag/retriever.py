@@ -44,13 +44,13 @@ def initialize(index: faiss.Index, chunks: List[Dict]) -> None:
 
 def _embed_query(query: str) -> np.ndarray:
     """
-    Embed a single query string using text-embedding-004.
+    Embed a single query string using text-embedding-004 (v1 stable API).
     Returns a L2-normalized float32 row vector of shape (1, 768).
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options={"api_version": "v1"})
     result = client.models.embed_content(
         model=EMBEDDING_MODEL,
         contents=query,

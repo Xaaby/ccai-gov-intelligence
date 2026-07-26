@@ -1,0 +1,73 @@
+name: Build and Deploy — ccai-gov-intelligence
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: earnest-sight-503519-t5
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  REPO: ccai-gov-intelligence
+  SERVICE: ccai-gov-intelligence
+  IMAGE: us-central1-docker.pkg.dev/earnest-sight-503519-t5/ccai-gov-intelligence/ccai-gov-intelligence
+
+jobs:
+  deploy:
+    name: Build → Push → Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write   # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/786562162192/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: gcp-devops-agent-sa@earnest-sight-503519-t5.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag ${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.IMAGE }}:latest \
+            .
+
+      - name: Push Docker image to Artifact Registry
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --concurrency 10 \
+            --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest \
+            --quiet
+
+      - name: Show deployed service URL
+        run: |
+          gcloud run services describe ${{ env.SERVICE }} \
+            --region ${{ env.REGION }} \
+            --format "value(status.url)"

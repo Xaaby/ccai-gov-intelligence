@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  ccai-gov-intelligence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ccai-gov-intelligence:local
+    ports:
+      - "8080:8080"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      # Mount local app/ directory for fast iteration without rebuilding
+      - ./app:/app/app
+    restart: unless-stopped

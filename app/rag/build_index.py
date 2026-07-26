@@ -200,11 +200,12 @@ def _chunk_pdf(pages: List[Tuple[int, str]]) -> List[Dict]:
     return chunks
 
 
-def _embed_chunks(client: genai.Client, chunks: List[Dict]) -> np.ndarray:
+def _embed_chunks(chunks: List[Dict]) -> np.ndarray:
     """
-    Generate embeddings for every chunk via text-embedding-004.
+    Generate embeddings for every chunk via text-embedding-004 (v1 stable API).
     Returns a float32 array of shape (len(chunks), DIMENSION).
     """
+    client = _get_embed_client()
     embeddings: List[List[float]] = []
     for i, chunk in enumerate(chunks):
         result = client.models.embed_content(

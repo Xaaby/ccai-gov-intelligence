@@ -67,10 +67,18 @@ def _embed_text_v1(api_key: str, text: str) -> List[float]:
     Bypasses the google-genai SDK to avoid batchEmbedContents routing issues.
     """
     base = "https://generativelanguage.googleapis.com/v1beta/models"
-    models = ["text-embedding-004", "embedding-001"]
-    body = json.dumps({"content": {"parts": [{"text": text}]}}).encode()
+    # Ordered by preference — newer keys only have gemini-embedding-* models
+    models_to_try = [
+        "gemini-embedding-001",
+        "text-embedding-004",
+        "embedding-001",
+    ]
 
-    for model in models:
+    for model in models_to_try:
+        body = json.dumps({
+            "content": {"parts": [{"text": text}]},
+            "outputDimensionality": DIMENSION,  # pin to 768 for FAISS consistency
+        }).encode()
         url = f"{base}/{model}:embedContent?key={api_key}"
         req = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}
@@ -78,19 +86,22 @@ def _embed_text_v1(api_key: str, text: str) -> List[float]:
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
+            logger.debug("[build_index] Embed success via %s", model)
             return data["embedding"]["values"]
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode(errors="replace")
             logger.warning(
                 "[build_index] Embed failed for %s (HTTP %d): %s",
-                model, exc.code, error_body[:400],
+                model, exc.code, error_body[:300],
             )
             if exc.code != 404:
                 raise
             # 404 → try next model
+
     raise RuntimeError(
-        "All embedding models returned 404. Check your GEMINI_API_KEY is valid "
-        "and has access to the Gemini API at generativelanguage.googleapis.com."
+        "All embedding models returned 404. Ensure your GEMINI_API_KEY is a "
+        "valid AI Studio key (https://aistudio.google.com/apikey) with the "
+        "Generative Language API enabled."
     )
 
 

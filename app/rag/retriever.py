@@ -52,19 +52,29 @@ def _embed_query(query: str) -> np.ndarray:
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
-    url = (
-        "https://generativelanguage.googleapis.com"
-        f"/v1beta/models/text-embedding-004:embedContent?key={api_key}"
-    )
-    body = json.dumps({
-        "content": {"parts": [{"text": query}]},
-    }).encode()
-    req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    values = data["embedding"]["values"]
+    base = "https://generativelanguage.googleapis.com/v1beta/models"
+    models_to_try = ["gemini-embedding-001", "text-embedding-004", "embedding-001"]
+    values = None
+    for model in models_to_try:
+        body = json.dumps({
+            "content": {"parts": [{"text": query}]},
+            "outputDimensionality": 768,
+        }).encode()
+        req = urllib.request.Request(
+            f"{base}/{model}:embedContent?key={api_key}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+            values = data["embedding"]["values"]
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+    if values is None:
+        raise RuntimeError("All embedding models returned 404 for query embed.")
     vector = np.array(values, dtype=np.float32).reshape(1, -1)
     faiss.normalize_L2(vector)
     return vector

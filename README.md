@@ -2,9 +2,11 @@
 
 A GCP-native dual-mode AI platform for government operations — 311 citizen request classification and CJIS Security Policy Q&A with cited section answers. Deployed on Cloud Run with Gemini 2.5 Flash.
 
-**Live demo:** [https://ccai-gov-intelligence-786562162192.us-central1.run.app](https://ccai-gov-intelligence-786562162192.us-central1.run.app)
+**Live demo (Streamlit):** [https://ccai-gov-intelligence-786562162192.us-central1.run.app](https://ccai-gov-intelligence-786562162192.us-central1.run.app)
 
-**Stack:** Python 3.11 · Streamlit · Gemini 2.5 Flash · FAISS · pypdf · Pydantic · SQLite · Cloud Run · GitHub Actions
+**FastAPI backend:** [https://ccai-gov-intelligence-api-786562162192.us-central1.run.app](https://ccai-gov-intelligence-api-786562162192.us-central1.run.app)
+
+**Stack:** Python 3.11 · Streamlit · FastAPI · Uvicorn · Gemini 2.5 Flash · FAISS · pypdf · Pydantic · SQLite · Cloud Run · GitHub Actions
 
 ---
 
@@ -58,7 +60,9 @@ MODE 2: CJIS RAG AGENT
        Writes to: SQLite cjis_queries table
 ```
 
-**Single process on Cloud Run** — Streamlit is the only listener on port 8080. All logic is imported directly. No FastAPI, no two-port setup.
+**Two Cloud Run services:**
+- **Streamlit** (`ccai-gov-intelligence`) — standalone demo UI, port 8080, imports mode logic directly
+- **FastAPI** (`ccai-gov-intelligence-api`) — HTTP backend for the `compliance-intelligence-platform` wrapper, port 8080, exposes `POST /classify`, `POST /query-cjis`, `GET /health`
 
 ---
 
@@ -118,7 +122,7 @@ To demonstrate cannot-answer: ask **"What is the capital of France?"** — the s
 
 | Service | Purpose |
 |---|---|
-| Cloud Run | Single Streamlit container · 1 Gi memory · port 8080 · 300s timeout |
+| Cloud Run | Two services: Streamlit demo + FastAPI backend · 1 Gi memory each · port 8080 · 300s timeout |
 | Artifact Registry | Docker image (`ccai-gov-intelligence` repo, us-central1) |
 | Secret Manager | `GEMINI_API_KEY` — never hardcoded |
 | Cloud Build | Triggered by GitHub Actions via Workload Identity Federation |
@@ -141,10 +145,15 @@ To demonstrate cannot-answer: ask **"What is the capital of France?"** — the s
 
 ```
 ccai-gov-intelligence/
-├── .github/workflows/deploy.yml
+├── .github/workflows/
+│   ├── deploy.yml                   ← Streamlit Cloud Run deploy
+│   └── deploy-api.yml              ← FastAPI Cloud Run deploy
 ├── app/
-│   ├── streamlit_app.py             ← single public process, 2 tabs
+│   ├── streamlit_app.py             ← standalone demo UI, 2 tabs (unchanged)
 │   ├── schemas.py                   ← all Pydantic models (built first)
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── main.py                 ← FastAPI: /classify, /query-cjis, /health
 │   ├── modes/
 │   │   ├── classify_311.py          ← Mode 1: Gemini structured output
 │   │   └── query_cjis.py           ← Mode 2: RAG retrieve + generate
@@ -157,7 +166,8 @@ ccai-gov-intelligence/
 │   │   ├── sample_queries.py       ← 5 demo CJIS questions
 │   │   └── gov_intel.db            ← SQLite baked into image at build
 │   └── requirements.txt
-├── Dockerfile
+├── Dockerfile                       ← Streamlit image
+├── Dockerfile.api                   ← FastAPI image
 ├── docker-compose.yml
 └── README.md
 ```
@@ -185,7 +195,9 @@ Or with Docker Compose:
 ```bash
 export GEMINI_API_KEY=your_key_here
 docker compose up --build
-# App at http://localhost:8080
+# Streamlit at http://localhost:8080
+# FastAPI at  http://localhost:8001
+# API docs at http://localhost:8001/docs
 ```
 
 ---

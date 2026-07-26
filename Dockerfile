@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Ensure 'from app.xxx import ...' resolves correctly regardless of how
+# Streamlit manipulates sys.path at startup
+ENV PYTHONPATH=/app
+
 # System dependencies for FAISS and PDF download
 RUN apt-get update && apt-get install -y \
     libgomp1 \

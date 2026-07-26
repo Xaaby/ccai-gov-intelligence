@@ -2,7 +2,7 @@
 
 **GCP-native dual-mode AI platform for government operations** — built with Gemini 2.5 Flash, FAISS, and Streamlit on Cloud Run. Designed to show government AI capabilities directly relevant to GTS's OmniDARS and CCAI product verticals.
 
-🔗 **Live URL:** `https://ccai-gov-intelligence-XXXXXXXXXX.us-central1.run.app` *(replace after first deploy)*
+🔗 **Live URL:** https://ccai-gov-intelligence-786562162192.us-central1.run.app
 
 ---
 

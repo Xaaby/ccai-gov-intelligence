@@ -54,10 +54,9 @@ def _embed_query(query: str) -> np.ndarray:
         raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
     url = (
         "https://generativelanguage.googleapis.com"
-        f"/v1/models/text-embedding-004:embedContent?key={api_key}"
+        f"/v1beta/models/text-embedding-004:embedContent?key={api_key}"
     )
     body = json.dumps({
-        "model": "models/text-embedding-004",
         "content": {"parts": [{"text": query}]},
     }).encode()
     req = urllib.request.Request(

@@ -68,10 +68,9 @@ def _embed_text_v1(api_key: str, text: str) -> List[float]:
     """
     url = (
         "https://generativelanguage.googleapis.com"
-        f"/v1/models/text-embedding-004:embedContent?key={api_key}"
+        f"/v1beta/models/text-embedding-004:embedContent?key={api_key}"
     )
     body = json.dumps({
-        "model": "models/text-embedding-004",
         "content": {"parts": [{"text": text}]},
     }).encode()
     req = urllib.request.Request(

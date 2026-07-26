@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 import faiss
 import numpy as np
 from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,10 @@ def _embed_query(query: str) -> np.ndarray:
     Embed a single query string using text-embedding-004 (v1 stable API).
     Returns a L2-normalized float32 row vector of shape (1, 768).
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
-    client = genai.Client(api_key=api_key, http_options={"api_version": "v1"})
+        raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1"))
     result = client.models.embed_content(
         model=EMBEDDING_MODEL,
         contents=query,

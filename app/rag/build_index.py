@@ -21,6 +21,7 @@ from typing import Dict, List, Tuple
 import faiss
 import numpy as np
 from google import genai
+from google.genai import types
 from pypdf import PdfReader
 from app.rag.cjis_policy_text import CJIS_POLICY_SECTIONS
 
@@ -52,11 +53,15 @@ def _get_embed_client() -> genai.Client:
     """
     Return a Gemini client configured for the v1 stable API.
     Required for text-embedding-004, which is not available on v1beta in SDK 2.x.
+    Uses types.HttpOptions (not a plain dict) to ensure the override is respected.
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
-    return genai.Client(api_key=api_key, http_options={"api_version": "v1"})
+        raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(api_version="v1"),
+    )
 
 
 def _pdf_is_valid(pdf_path: Path) -> bool:

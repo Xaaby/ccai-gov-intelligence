@@ -15,13 +15,13 @@ import logging
 import os
 import re
 import time
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import faiss
 import numpy as np
 from google import genai
-from google.genai import types
 from pypdf import PdfReader
 from app.rag.cjis_policy_text import CJIS_POLICY_SECTIONS
 
@@ -49,19 +49,37 @@ def _get_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def _get_embed_client() -> genai.Client:
+def _get_api_key() -> str:
+    """Return the active Gemini API key from environment."""
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY is set.")
+    return key
+
+
+def _embed_text_v1(api_key: str, text: str) -> List[float]:
     """
-    Return a Gemini client configured for the v1 stable API.
-    Required for text-embedding-004, which is not available on v1beta in SDK 2.x.
-    Uses types.HttpOptions (not a plain dict) to ensure the override is respected.
+    Embed a single text string using the v1 REST API directly.
+
+    Bypasses the google-genai SDK entirely to avoid the SDK's hardcoded
+    v1beta routing which makes text-embedding-004 unavailable.
+
+    Endpoint: POST /v1/models/text-embedding-004:embedContent
     """
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
-    return genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(api_version="v1"),
+    url = (
+        "https://generativelanguage.googleapis.com"
+        f"/v1/models/text-embedding-004:embedContent?key={api_key}"
     )
+    body = json.dumps({
+        "model": "models/text-embedding-004",
+        "content": {"parts": [{"text": text}]},
+    }).encode()
+    req = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    return data["embedding"]["values"]
 
 
 def _pdf_is_valid(pdf_path: Path) -> bool:
@@ -207,17 +225,14 @@ def _chunk_pdf(pages: List[Tuple[int, str]]) -> List[Dict]:
 
 def _embed_chunks(chunks: List[Dict]) -> np.ndarray:
     """
-    Generate embeddings for every chunk via text-embedding-004 (v1 stable API).
+    Generate embeddings for every chunk via text-embedding-004 v1 REST API.
     Returns a float32 array of shape (len(chunks), DIMENSION).
     """
-    client = _get_embed_client()
+    api_key = _get_api_key()
     embeddings: List[List[float]] = []
     for i, chunk in enumerate(chunks):
-        result = client.models.embed_content(
-            model=EMBEDDING_MODEL,
-            contents=chunk["chunk_text"],
-        )
-        embeddings.append(result.embeddings[0].values)
+        values = _embed_text_v1(api_key, chunk["chunk_text"])
+        embeddings.append(values)
         if (i + 1) % 10 == 0:
             logger.info("[build_index] Embedded %d / %d chunks…", i + 1, len(chunks))
         time.sleep(0.5)  # stay within free-tier rate limit (15 RPM)

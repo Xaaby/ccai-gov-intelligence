@@ -8,14 +8,15 @@ via initialize(). retrieve_chunks() is the single public function used by
 query_cjis.py.
 """
 
+import json
 import logging
 import os
+import urllib.request
 from typing import Dict, List, Optional
 
 import faiss
 import numpy as np
 from google import genai
-from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +46,27 @@ def initialize(index: faiss.Index, chunks: List[Dict]) -> None:
 
 def _embed_query(query: str) -> np.ndarray:
     """
-    Embed a single query string using text-embedding-004 (v1 stable API).
+    Embed a query string using text-embedding-004 v1 REST API directly.
     Returns a L2-normalized float32 row vector of shape (1, 768).
     """
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("Neither GEMINI_API_KEY nor GOOGLE_API_KEY environment variable is set.")
-    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1"))
-    result = client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=query,
+    url = (
+        "https://generativelanguage.googleapis.com"
+        f"/v1/models/text-embedding-004:embedContent?key={api_key}"
     )
-    vector = np.array(result.embeddings[0].values, dtype=np.float32).reshape(1, -1)
+    body = json.dumps({
+        "model": "models/text-embedding-004",
+        "content": {"parts": [{"text": query}]},
+    }).encode()
+    req = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    values = data["embedding"]["values"]
+    vector = np.array(values, dtype=np.float32).reshape(1, -1)
     faiss.normalize_L2(vector)
     return vector
 
